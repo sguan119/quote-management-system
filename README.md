@@ -91,8 +91,8 @@ QuoteEstimator/
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/quote-estimator.git
-   cd quote-estimator
+   git clone https://github.com/sguan119/quote-management-system.git
+   cd quote-management-system
    ```
 
 2. Open the project:
@@ -225,12 +225,22 @@ Replace these with your actual pricing in production.
 
 ## Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) for details on:
+
+- Code of Conduct
+- Development setup
+- Coding standards
+- Commit message guidelines
+- Pull request process
+
+Quick start:
 
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes with tests
-4. Submit a pull request
+4. Commit your changes (`git commit -m 'feat: Add amazing feature'`)
+5. Push to your branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
 
 ## Documentation
 
@@ -241,7 +251,7 @@ Contributions are welcome! Please:
 
 ## License
 
-[Choose appropriate license - MIT, Apache 2.0, etc.]
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
