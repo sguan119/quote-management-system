@@ -1,0 +1,1395 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Select courses most relevant to the target job skills.\n\n<target_skills>\n{{ JSON.stringify($json.jdAnalysis.top_10_skills?.slice(0, 5).map(s => s.skill) || []) }}\n</target_skills>\n\n<available_courses>\n{{ $json.masterCoursesContent }}\n</available_courses>\n\n<rules>\n1. Select 3-4 courses with strongest skill alignment\n2. Prioritize courses matching top-ranked skills\n3. Return EXACT course names as listed\n4. If no strong matches, return empty array\n</rules>\n\nReturn ONLY valid JSON: {\"selected_courses\": [\"Machine Learning\", \"Data Mining\"]}",
+        "options": {
+          "returnIntermediateSteps": false
+        }
+      },
+      "id": "f8790fca-d66d-4a20-8f35-08e55862570d",
+      "name": "AI - Extract Master Courses",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -496,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1744,
+        784
+      ],
+      "id": "358227f3-aea4-4335-8b3e-e20c08ec9928",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Refine the skills section to meet strict character limits.\n\n<output_format_rule>\nCRITICAL: Return ONLY the final JSON object.\nNO explanations, NO character counts, NO \"Let me fix that\", NO thinking process.\nONLY output: {\"skills_by_category\": {...}}\nAny text outside the JSON will cause parsing failure.\n</output_format_rule>\n\n<current_skills>\n{{ JSON.stringify($json.rawSkillsByCategory) }}\n</current_skills>\n\n<critical_requirement>\nWhen rendered as \"Category: skill1, skill2, skill3\", the ENTIRE LINE must be under 86 characters.\nMax 4 categories. Max 6 items per category. Total < 20 items.\n\nExample of how to count:\nInput: {\"Programming\": [\"Python (NumPy, Pandas)\", \"SQL\", \"R\"]}\nRendered line: \"Programming: Python (NumPy, Pandas), SQL, R\"\nCharacter count: 45 characters ✓ PASS\n\nInput: {\"Data Analysis & Programming\": [\"Python (NumPy, Pandas, scikit-learn)\", \"SQL (MySQL, complex queries)\", \"R (statistical modeling)\"]}\nRendered line: \"Data Analysis & Programming: Python (NumPy, Pandas, scikit-learn), SQL (MySQL, complex queries), R (statistical modeling)\"\nCharacter count: 128 characters ✗ FAIL - MUST REDUCE!\n</critical_requirement>\n\n<refinement_strategy>\nFor EACH category, you MUST:\n1. Calculate: CategoryName + \": \" + skill1 + \", \" + skill2 + \", \" + ... \n2. If total > 86 characters, apply these fixes IN ORDER:\n   a) Remove ALL parenthetical details: \"Python (NumPy, Pandas)\" -> \"Python\"\n   b) Shorten category names: \"Data Analysis & Programming\" -> \"Programming\"\n   c) Remove lowest-priority skills (keep only top 3-4)\n   d) Use abbreviations: \"PostgreSQL\" -> \"Postgres\", \"JavaScript\" -> \"JS\"\n3. Re-count after each change until < 90 characters\n</refinement_strategy>\n\n<examples>\nBEFORE (128 chars): \"Data Analysis & Programming: Python (NumPy, Pandas, scikit-learn), SQL (MySQL, complex queries), R (statistical modeling)\"\nAFTER (65 chars): \"Programming: Python, SQL, R, Statistical Methods, Machine Learning\"\n\nBEFORE (95 chars): \"Analytics Tools & Platforms: Power BI (visualization), Looker, Snowflake, Amplitude, DBT\"\nAFTER (57 chars): \"Analytics Tools: Power BI, Looker, Snowflake, Amplitude\"\n</examples>\n\nReturn ONLY valid JSON:\n{\"skills_by_category\": {\"Programming\": [\"Python\", \"SQL\", \"R\"], \"Tools\": [\"Power BI\", \"Looker\", \"Snowflake\"]}}",
+        "options": {
+          "returnIntermediateSteps": false
+        }
+      },
+      "id": "48638157-a653-4af0-910c-221dd36d9b95",
+      "name": "AI - Refine Skills Length (Step 2)1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        560,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4.5"
+        },
+        "options": {
+          "maxTokensToSample": 20000,
+          "temperature": 0.3
+        }
+      },
+      "id": "578e0225-3084-415e-bedb-153c104038b2",
+      "name": "Claude - JD Analysis4",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        -432,
+        224
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "NoS33HGuNguSCNNg",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4.5"
+        },
+        "options": {
+          "maxTokensToSample": 20000,
+          "temperature": 0.3
+        }
+      },
+      "id": "39547813-aef0-452a-aa36-a15cad6c8c63",
+      "name": "Claude - JD Analysis3",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        640,
+        1152
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "NoS33HGuNguSCNNg",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4.5"
+        },
+        "options": {
+          "maxTokensToSample": 20000,
+          "temperature": 0.3
+        }
+      },
+      "id": "9b821f3b-d9ae-456c-bf81-9f7869447009",
+      "name": "Claude - JD Analysis2",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        -432,
+        1840
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "NoS33HGuNguSCNNg",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4.5"
+        },
+        "options": {
+          "maxTokensToSample": 20000,
+          "temperature": 0.3
+        }
+      },
+      "id": "18af397d-5b45-4c90-8a15-aa1f86f6a0e9",
+      "name": "Claude - JD Analysis1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        288,
+        1840
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "NoS33HGuNguSCNNg",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4.5"
+        },
+        "options": {
+          "maxTokensToSample": 20000,
+          "temperature": 0.3
+        }
+      },
+      "id": "7ac895d4-f386-4d59-90b1-fcd376a0385e",
+      "name": "Claude - JD Analysis6",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        -432,
+        736
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "NoS33HGuNguSCNNg",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// This code uses async to properly read binary data from n8n filesystem mode\nconst data = $('Combine All Data').first().json;\nconst templateFile = $input.first();\n\n// Helper: Generate contact line\nfunction generateContactLine(info) {\n  if (!info) return '';\n  const parts = [];\n  if (info.location) parts.push(info.location);\n  if (info.phone) parts.push(info.phone);\n  if (info.email) parts.push(`<a href=\"mailto:${info.email}\">${info.email}</a>`);\n  if (info.linkedin) parts.push(`<a href=\"${info.linkedin}\">LinkedIn</a>`);\n  if (info.github) parts.push(`<a href=\"${info.github}\">GitHub</a>`);\n  return parts.join(' | ');\n}\n\n// Helper: Generate skills HTML\nfunction generateSkillsSection(skillsByCategory) {\n  if (!skillsByCategory || typeof skillsByCategory !== 'object') {\n    return '<p>No skills data available.</p>';\n  }\n  let html = '';\n  for (const [category, skills] of Object.entries(skillsByCategory)) {\n    if (Array.isArray(skills) && skills.length > 0) {\n      html += `<p class=\"skills-line\"><span class=\"skills-label\">${category}:</span> ${skills.join(', ')}</p>\\n`;\n    }\n  }\n  return html || '<p>No skills data available.</p>';\n}\n\n// Helper: Generate projects HTML\nfunction generateProjectsSection(projects) {\n  if (!Array.isArray(projects) || projects.length === 0) {\n    return '<p>No matching projects found.</p>';\n  }\n  return projects.map(project => {\n    if (!project) return '';\n    const title = project.project_title || project.original_name || 'Untitled Project';\n    const date = project.project_date || '';\n    const url = project.project_url || '';\n    const bullets = Array.isArray(project.impact_sentences) \n      ? project.impact_sentences.map(s => `<li>${s}</li>`).join('\\n')\n      : '';\n    const dateSpan = date ? `<span class=\"entry-date\">${date}</span>` : '';\n    const titleHtml = url ? `<a href=\"${url}\" class=\"entry-title\" target=\"_blank\">${title}</a>` : `<span class=\"entry-title\">${title}</span>`;\n    return `<div class=\"entry\">\\n<div class=\"entry-header\">\\n${titleHtml}\\n${dateSpan}\\n</div>\\n<ul>\\n${bullets}\\n</ul>\\n</div>`;\n  }).filter(Boolean).join('\\n');\n}\n\n// Read template using n8n's built-in binary helper (handles filesystem-v2 mode)\nlet template = '';\ntry {\n  // Use getBinaryDataBuffer to properly read binary data from filesystem\n  const binaryDataBuffer = await this.helpers.getBinaryDataBuffer(0, 'data');\n  template = binaryDataBuffer.toString('utf-8');\n} catch (e) {\n  throw new Error('Failed to read template file: ' + e.message);\n}\n\nif (!template || template.trim().length === 0) {\n  throw new Error('Template file is empty');\n}\n\n// Prepare replacement values with null checks\nconst replacements = {\n  '{{NAME}}': data.personalInfo?.name || 'Your Name',\n  '{{CONTACT_LINE}}': generateContactLine(data.personalInfo),\n  '{{MASTER_COURSES}}': Array.isArray(data.masterCourses) && data.masterCourses.length > 0 ? data.masterCourses.join('; ') : 'N/A',\n  '{{BACHELOR_COURSES}}': Array.isArray(data.bachelorCourses) && data.bachelorCourses.length > 0 ? data.bachelorCourses.join('; ') : 'N/A',\n  '{{PROJECTS_SECTION}}': generateProjectsSection(data.matchedProjects),\n  '{{SKILLS_SECTION}}': generateSkillsSection(data.skillsByCategory)\n};\n\n// Replace all placeholders in template\nlet html = template;\nfor (const [placeholder, value] of Object.entries(replacements)) {\n  html = html.replace(new RegExp(placeholder.replace(/[{}]/g, '\\\\$&'), 'g'), value);\n}\n\nconst fileName = (data.personalInfo?.name || 'Resume').replace(/[^a-zA-Z0-9]/g, '_');\n\nreturn [{\n  json: {\n    ...data,\n    resumeHtml: html,\n    fileName: fileName\n  },\n  binary: {\n    resume: await this.helpers.prepareBinaryData(\n      Buffer.from(html, 'utf-8'),\n      `${fileName}_Resume.html`,\n      'text/html; charset=utf-8'\n    )\n  }\n}];"
+      },
+      "id": "dd125bc5-6f45-499a-a49c-adbab3ce4c74",
+      "name": "Generate Resume HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2960,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/.n8n-files/data/templates/resume_template.html",
+        "options": {}
+      },
+      "id": "18de24e4-3548-4e3e-8eed-afdae755fc08",
+      "name": "Read Template File",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        2736,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\n// Fixed personal info\nconst PERSONAL_INFO = {\n  name: 'Shicheng (Sam) Guan',\n  email: 'sam.guan@example.com',\n  phone: '(123) 456-7890',\n  linkedin: 'https://linkedin.com/in/samguan',\n  github: 'https://github.com/samguan',\n  location: 'San Francisco, CA'\n};\n\n// Extract data from each branch\nlet masterCourses = [];\nlet bachelorCourses = [];\nlet skillsByCategory = {};\nlet projectsWithImpact = [];\nlet unmatchedSkills = [];\n\nfor (const item of items) {\n  const data = item.json;\n  if (data.masterCourses) masterCourses = data.masterCourses;\n  if (data.bachelorCourses) bachelorCourses = data.bachelorCourses;\n  if (data.skillsByCategory) skillsByCategory = data.skillsByCategory;\n  if (data.projectsWithImpact) projectsWithImpact = data.projectsWithImpact;\n  if (data.unmatchedSkills) unmatchedSkills = data.unmatchedSkills;\n}\n\nreturn [{\n  json: {\n    personalInfo: PERSONAL_INFO,\n    masterCourses: masterCourses,\n    bachelorCourses: bachelorCourses,\n    skillsByCategory: skillsByCategory,\n    matchedProjects: projectsWithImpact,\n    unmatchedSkills: unmatchedSkills\n  }\n}];"
+      },
+      "id": "83108d5b-9ac0-4d6a-923e-e045e46430f1",
+      "name": "Combine All Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2512,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "9bf2d4f0-6089-43af-acfa-932fbbbe161b",
+      "name": "Merge All Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        2288,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "842ddb99-8d14-4df2-b28a-dae13435a1a2",
+      "name": "Merge Skills & Projects",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        2064,
+        1440
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "2cb1f372-2872-4cdf-9755-160edafb2067",
+      "name": "Merge Courses",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        272,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Read accumulated results from staticData (items arrive at different times due to shortening loop)\nconst staticData = $getWorkflowStaticData('global');\nconst allProjects = staticData.projectResults || [];\nconst expectedCount = staticData.expectedProjectCount || 0;\n\n// Check if all expected projects have arrived\nif (allProjects.length < expectedCount) {\n  // Not all projects ready yet - return empty but don't clear\n  // This node will be called again when more items arrive\n  return [];\n}\n\n// All projects have arrived - filter and output\nconst projectsWithImpact = allProjects\n  .filter(p => p && p.impact_sentences && p.impact_sentences.length > 0)\n  .filter(p => p.project_title !== 'Unknown Project' && p.original_name !== '');\n\n// Clear staticData for next run\nstaticData.projectResults = [];\nstaticData.expectedProjectCount = 0;\n\nreturn [{\n  json: {\n    projectsWithImpact: projectsWithImpact,\n    projectCount: projectsWithImpact.length,\n    branch: 'projects'\n  }\n}];"
+      },
+      "id": "ebc293f1-1627-4767-b7ce-175186a48282",
+      "name": "Aggregate Project Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        1792
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {
+          "maxTokensToSample": 4000,
+          "temperature": 0.2
+        }
+      },
+      "id": "62c1868d-c613-4f07-81ec-6d6e850dd271",
+      "name": "Claude - Shortener",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1440,
+        1616
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "NoS33HGuNguSCNNg",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $input.item.json;\n\n// Accumulate results in staticData (parallel items arrive at different times)\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.projectResults) {\n  staticData.projectResults = [];\n}\n\nif (input.projectData) {\n  staticData.projectResults.push(input.projectData);\n}\n\nreturn {\n  json: {\n    optimizedProject: input.projectData,\n    projectCount: staticData.projectResults.length,\n    branch: 'projects'\n  }\n};"
+      },
+      "id": "06a9ae6c-d463-428b-b84e-fd4a6cf6f00e",
+      "name": "Finalize Project",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        1792
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $input.item.json;\nconst content = input.output || input.text || '';\n\n// Get the corresponding Check Loop data for this item\n// Use $itemIndex to match the correct item when multiple projects are processed in parallel\nconst checkLoopItems = $('Check Loop').all();\nconst currentIndex = $itemIndex;\nconst checkLoopData = checkLoopItems[currentIndex]?.json || $('Check Loop').first().json || {};\nconst iteration = checkLoopData.iteration || 1;\n\n// CRITICAL FIX: Get validSentences that were already short enough\n// These were separated out in Validate Char Count but not passed to AI\nconst validSentences = checkLoopData.validSentences || [];\n\nlet projectData;\nlet jsonStr = content;\n\nif (content.includes('```json')) {\n  const match = content.match(/```json\\s*([\\s\\S]*?)\\s*```/);\n  if (match) jsonStr = match[1];\n} else if (content.includes('```')) {\n  const match = content.match(/```\\s*([\\s\\S]*?)\\s*```/);\n  if (match) jsonStr = match[1];\n} else {\n  const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) jsonStr = jsonMatch[0];\n}\n\ntry {\n  projectData = JSON.parse(jsonStr.trim());\n} catch (e) {\n  throw new Error('Failed to parse shortened sentences: ' + e.message);\n}\n\n// CRITICAL FIX: Merge validSentences back with the shortened sentences\n// AI only returned the shortened versions of too-long sentences\n// We need to combine them with the already-valid sentences\nconst shortenedSentences = projectData.impact_sentences || [];\nprojectData.impact_sentences = [...validSentences, ...shortenedSentences];\n\nreturn {\n  json: {\n    projectData: projectData,\n    iteration: iteration,\n    branch: 'projects'\n  }\n};"
+      },
+      "id": "516ef149-3cc4-4176-b6d7-2468a0837cdc",
+      "name": "Parse Shortened",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        1488
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=AGGRESSIVELY shorten each impact sentence to 85-95 characters.\n\n<sentences_too_long>\n{{ JSON.stringify($json.tooLongSentences) }}\n</sentences_too_long>\n\n<CRITICAL_REQUIREMENT>\nCurrent sentences are 150-230 chars. Target is 85-95 chars.\nYou must CUT 50-60% of each sentence. Be RUTHLESS.\nDo NOT use any HTML formatting tags like <b>, <i>, etc. Plain text only.\n</CRITICAL_REQUIREMENT>\n\n<shortening_rules>\n1. REMOVE all context/background: \"for GreenTech Painting\" → delete\n2. REMOVE parenthetical lists: \"(customer management, room config...)\" → delete\n3. KEEP only: Action + Tool + ONE metric\n4. USE abbreviations: \"development\" → \"dev\", \"application\" → \"app\"\n\n<examples>\nBEFORE (173 chars): \"Led end-to-end delivery of iOS quoting app for GreenTech Painting, reducing data entry from 3x to 1x across iPad/Excel/QuickBooks and eliminating manual transcription errors\"\nAFTER (68 chars): \"Built iOS quoting app reducing data entry 3x to 1x, eliminating errors\"\n\nBEFORE (218 chars): \"Engineered SwiftUI + MVVM architecture with 6 core modules (customer management, room configuration, real-time estimate calculation, QBO OAuth sync, queue management, CoreData persistence) across 6 milestone cycles\"\nAFTER (58 chars): \"Engineered SwiftUI + MVVM app with 6 modules and QBO sync\"\n</examples>\n\nReturn ONLY valid JSON:\n{\n  \"project_title\": \"{{ $json.projectData.project_title }}\",\n  \"project_date\": \"{{ $json.projectData.project_date }}\",\n  \"original_name\": \"{{ $json.projectData.original_name }}\",\n  \"matched_skill\": \"{{ $json.projectData.matched_skill }}\",\n  \"impact_sentences\": [\"short sentence 85-95 chars\", \"...\"]\n}",
+        "options": {
+          "returnIntermediateSteps": false
+        }
+      },
+      "id": "5c72882c-0de8-4210-a50a-2b0a5f694995",
+      "name": "AI - Shorten Sentences",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1360,
+        1392
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-continue",
+              "leftValue": "={{ $json.shouldContinue }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "76193fdd-4860-461f-8c51-2bdf6b1ef941",
+      "name": "Check Loop",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1136,
+        1552
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $input.item.json;\nlet projectData = input.projectData;\n\n// If coming from AI - Shorten Sentences, parse the response\nif (input.output || input.text) {\n  const content = input.output || input.text || '';\n  let jsonStr = content;\n  \n  if (content.includes('```json')) {\n    const match = content.match(/```json\\s*([\\s\\S]*?)\\s*```/);\n    if (match) jsonStr = match[1];\n  } else if (content.includes('```')) {\n    const match = content.match(/```\\s*([\\s\\S]*?)\\s*```/);\n    if (match) jsonStr = match[1];\n  } else {\n    const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) jsonStr = jsonMatch[0];\n  }\n  \n  try {\n    projectData = JSON.parse(jsonStr.trim());\n  } catch (e) {\n    // Keep existing projectData if parse fails\n  }\n}\n\nconst MAX_CHARS = 95;\nconst iteration = (input.iteration || 0) + 1;\n\n// Helper: count text chars (plain text, no HTML tags)\nfunction countChars(sentence) {\n  return sentence.length;\n}\n\nconst sentences = projectData.impact_sentences || [];\nconst tooLongSentences = [];\nconst validSentences = [];\n\nfor (const sentence of sentences) {\n  const charCount = countChars(sentence);\n  if (charCount > MAX_CHARS) {\n    tooLongSentences.push({\n      sentence: sentence,\n      currentChars: charCount,\n      needToRemove: charCount - MAX_CHARS\n    });\n  } else {\n    validSentences.push(sentence);\n  }\n}\n\nconst allValid = tooLongSentences.length === 0;\nconst maxIterations = 5;\nconst shouldContinue = !allValid && iteration < maxIterations;\n\nreturn {\n  json: {\n    projectData: projectData,\n    tooLongSentences: tooLongSentences,\n    validSentences: validSentences,\n    allValid: allValid,\n    iteration: iteration,\n    shouldContinue: shouldContinue,\n    branch: 'projects'\n  }\n};"
+      },
+      "id": "cd2fc9ef-5ff0-4aa8-9321-6d83b8a017c2",
+      "name": "Validate Char Count",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const response = $input.item.json;\nconst content = response.output || response.text || '';\n\nif (!content || content.trim() === '') {\n  throw new Error('[Parse Written Impact] AI返回空内容');\n}\n\nlet jsonStr = content;\n\nif (content.includes('```json')) {\n  const match = content.match(/```json\\s*([\\s\\S]*?)\\s*```/);\n  if (match) jsonStr = match[1];\n} else if (content.includes('```')) {\n  const match = content.match(/```\\s*([\\s\\S]*?)\\s*```/);\n  if (match) jsonStr = match[1];\n} else {\n  const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) jsonStr = jsonMatch[0];\n}\n\nlet impactData;\ntry {\n  impactData = JSON.parse(jsonStr.trim());\n} catch (e) {\n  throw new Error('[Parse Written Impact] JSON解析失败: ' + e.message);\n}\n\nif (!impactData.project_title || !impactData.impact_sentences) {\n  throw new Error('[Parse Written Impact] 缺少必填字段');\n}\n\nreturn {\n  json: {\n    projectData: impactData,\n    iteration: 0,\n    branch: 'projects'\n  }\n};"
+      },
+      "id": "745fdc8b-7183-475e-9ccc-3c3ddb888d56",
+      "name": "Parse Written Impact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Write high-density resume bullet points for this project.\n\n<context>\nTarget Skill: {{ $json.currentProject.matched_skill }}\nBusiness Goal: {{ $json.jdAnalysis.business_goal }}\nSuccess Metrics: {{ JSON.stringify($json.jdAnalysis.success_metrics) }}\n</context>\n\n<project_raw_data>\n{{ $json.projectContent }}\n</project_raw_data>\n\n<writing_guidelines>\n1. FORMULA: Action Verb + Context/Problem + Tool + Quantitative Result.\n2. BUSINESS STORY: Don't just say \"built a model\"; say \"optimized [Metric] for [Business Process] using [Model]\".\n3. QUANTIFY: Use %, $, or absolute numbers for EVERY bullet.\n4. NO BUZZWORDS: Avoid \"Responsible for\". Start with strong verbs (Led, Optimized, Engineered).\n5. CRITICAL: Project title MUST be under 60 characters.\n6. Keep 3-5 impact sentences per project.\n7. NO FORMATTING: Do NOT use any HTML tags like <b>, <i>, <strong>, etc. Output plain text only.\n</writing_guidelines>\n\n<title_shortening_techniques>\n- Remove unnecessary words: \"A Machine Learning Model for\" -> \"ML-Based\"\n- Use abbreviations: \"Recommendation\" -> \"Rec.\", \"Application\" -> \"App\"\n- Simplify: \"Analysis and Visualization Dashboard\" -> \"Analytics Dashboard\"\n</title_shortening_techniques>\n\n<date_extraction>\nExtract the project date from LINE 2 of the project content.\nFormat: \"Month YYYY - Month YYYY\" or \"Month YYYY - Present\"\n</date_extraction>\n\nReturn ONLY valid JSON:\n{\n  \"project_title\": \"Under 60 chars title\",\n  \"project_date\": \"...\",\n  \"project_url\": \"{{ $json.projectUrl }}\",\n  \"original_name\": \"{{ $json.projectFileName }}\",\n  \"matched_skill\": \"{{ $json.currentProject.matched_skill }}\",\n  \"impact_sentences\": [\n    \"Optimized loan approval using Python ML models, achieving 0.86 AUC and reducing false positives by 23%\",\n    \"Built StandardScaler pipelines with proper train-test splits, preventing data leakage across 3 model variants\"\n  ]\n}",
+        "options": {
+          "returnIntermediateSteps": false
+        }
+      },
+      "id": "67384b0e-50f8-449f-b6dc-422acb157451",
+      "name": "AI - Write Impact (Step 1)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        208,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst previousData = $('Process Projects').first().json;\nlet projectsData;\n\ntry {\n  const content = response.output || response.text || '';\n  const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    projectsData = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found');\n  }\n} catch (e) {\n  projectsData = { selected_projects: [] };\n}\n\n// Get projects map from Process Projects node\nconst projectsMap = previousData.projectsMap || {};\nconst projectUrlsMap = previousData.projectUrlsMap || {};\n\n// DEBUG: Track available keys\nconst availableKeys = Object.keys(projectsMap);\n\n// Enrich selected projects with their content from the map\nconst enrichedProjects = (projectsData.selected_projects || []).map(project => {\n  const fileName = project.file_name || '';\n  let matchedKey = '';\n  \n  // Try exact match first, then case-insensitive match\n  let projectContent = projectsMap[fileName] || '';\n  if (projectContent) {\n    matchedKey = fileName;\n  }\n  \n  // If no exact match, try case-insensitive and normalized matching\n  if (!projectContent) {\n    const normalizedFileName = fileName.toLowerCase().replace(/[\\s-]/g, '_').replace(/_+/g, '_');\n    for (const [key, value] of Object.entries(projectsMap)) {\n      const normalizedKey = key.toLowerCase().replace(/[\\s-]/g, '_').replace(/_+/g, '_');\n      if (normalizedKey === normalizedFileName || key.toLowerCase() === fileName.toLowerCase()) {\n        projectContent = value;\n        matchedKey = key;\n        break;\n      }\n    }\n  }\n  \n  return {\n    ...project,\n    projectContent: projectContent,\n    projectUrl: projectUrlsMap[matchedKey] || '',\n    matchedKey: matchedKey\n  };\n});\n\n// Store expected count in staticData for aggregation\nconst staticData = $getWorkflowStaticData('global');\nstaticData.expectedProjectCount = enrichedProjects.length;\nstaticData.projectResults = []; // Reset for new run\n\n// Return as individual items for parallel AI processing\nreturn enrichedProjects.map(project => ({\n  json: {\n    jdAnalysis: previousData.jdAnalysis,\n    top3Skills: previousData.top3Skills,\n    currentProject: project,\n    projectContent: project.projectContent,\n    projectFileName: project.file_name,\n    projectUrl: project.projectUrl || '',\n    expectedProjectCount: enrichedProjects.length,\n    branch: 'projects',\n    debug: {\n      availableKeys: availableKeys,\n      requestedFileName: project.file_name,\n      matchedKey: project.matchedKey,\n      contentFound: !!project.projectContent,\n      contentLength: project.projectContent?.length || 0,\n      contentPreview: project.projectContent?.substring(0, 200) || 'EMPTY'\n    }\n  }\n}));"
+      },
+      "id": "575fcfa4-160f-4212-976c-931d39fe0f9d",
+      "name": "Parse Selected Projects",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Select 3 projects that best demonstrate the candidate's ability to solve the business problems identified in the JD.\n\n<business_context>\nGoal: {{ $json.jdAnalysis.business_goal }}\nTop Skills: {{ JSON.stringify($json.top3Skills) }}\n</business_context>\n\n<available_projects>\n{{ $json.projectsContent }}\n</available_projects>\n\n<file_format>\nEach project starts with [FILE: filename] marker.\nExample: [FILE: car-price-regression]\nYou MUST extract the exact filename from this marker.\n</file_format>\n\n<selection_logic>\n1. RELEVANCE: Choose projects that mirror the company's industry or the role's core challenges.\n2. DIVERSITY: Ensure the 3 projects together cover at least 80% of the \"Essential\" JD skills.\n3. RECENTNESS: Favor projects with dates closer to the present.\n4. CRITICAL: Only select from available_projects - NEVER invent projects.\n</selection_logic>\n\n<output_rules>\n1. CRITICAL: Extract file_name from [FILE: xxx] marker EXACTLY as written.\n2. DO NOT modify, translate, or generate file names based on project titles.\n3. Example: If you see [FILE: car-price-regression], return \"car-price-regression\".\n4. Rank by relevance (best match = index 0).\n</output_rules>\n\nReturn ONLY valid JSON: \n{\"selected_projects\": [{\"file_name\": \"car-price-regression\", \"matched_skill\": \"Python\", \"relevance_reason\": \"Directly applies ML to solve pricing optimization\"}]}",
+        "options": {
+          "returnIntermediateSteps": false
+        }
+      },
+      "id": "acfeb584-e69b-4481-a2d0-173e8d80a026",
+      "name": "AI - Select Top 3 Projects",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -496,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const previousData = $('Parse JD Analysis').first().json;\nconst items = $input.all();\n\nlet projectsContent = '';\nconst projectsMap = {}; // file_name -> content mapping\nconst projectUrlsMap = {}; // file_name -> URL mapping\nconst debugInfo = []; // DEBUG: track file processing\n\ntry {\n  // Process each file item using n8n's built-in helper (handles filesystem-v2 mode)\n  for (let i = 0; i < items.length; i++) {\n    const item = items[i];\n    try {\n      const binaryDataBuffer = await this.helpers.getBinaryDataBuffer(i, 'data');\n      const content = binaryDataBuffer.toString('utf-8');\n      \n      // Extract file name from binary metadata\n      const fileName = item.binary?.data?.fileName || '';\n      // Remove .md extension and path to get clean file name\n      const cleanName = fileName.replace(/\\.md$/i, '').replace(/^.*[\\\\\\/]/, '');\n      \n      // Extract URL if present\n      const urlMatch = content.match(/^URL:\\s*(.+)$/m);\n      const projectUrl = urlMatch ? urlMatch[1].trim() : '';\n      \n      // Add file name marker before content\n      projectsContent += `[FILE: ${cleanName}]\\n${content}\\n\\n`;\n      \n      // DEBUG: Log file processing\n      debugInfo.push({\n        originalFileName: fileName,\n        cleanName: cleanName,\n        contentLength: content.length,\n        firstLine: content.split('\\n')[0],\n        secondLine: content.split('\\n')[1] || 'NO SECOND LINE'\n      });\n      \n      if (cleanName) {\n        projectsMap[cleanName] = content;\n        projectUrlsMap[cleanName] = projectUrl;\n      }\n    } catch (e) {\n      debugInfo.push({ error: e.message, index: i });\n    }\n  }\n} catch (error) {\n  projectsContent = '';\n}\n\nreturn [{\n  json: {\n    ...previousData,\n    projectsContent: projectsContent,\n    projectsMap: projectsMap,\n    projectUrlsMap: projectUrlsMap,\n    branch: 'projects',\n    debugProcessProjects: {\n      filesProcessed: debugInfo,\n      mapKeys: Object.keys(projectsMap),\n      totalFiles: items.length\n    }\n  }\n}];"
+      },
+      "id": "bb5be28d-10c0-4cfb-8fad-5c0415961075",
+      "name": "Process Projects",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/.n8n-files/data/relevant_project/*.md",
+        "options": {}
+      },
+      "id": "533cc369-ea1f-4456-8d2b-9e68c111a290",
+      "name": "Read Project Files",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -944,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {
+          "maxTokensToSample": 4000,
+          "temperature": 0.2
+        }
+      },
+      "id": "fc4642f6-935a-47be-ba4f-4185fa4b2830",
+      "name": "Claude - Skills Shortener",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1792,
+        928
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "NoS33HGuNguSCNNg",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\n// Final output - extract skillsByCategory from skillsData\nreturn [{\n  json: {\n    skillsByCategory: input.skillsData?.skills_by_category || {},\n    branch: 'skills'\n  }\n}];"
+      },
+      "id": "7d930312-147c-4eee-abea-428838141327",
+      "name": "Finalize Skills",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst content = input.output || input.text || '';\n\n// Get iteration from the Check Skills Loop node\nconst checkLoopData = $('Check Skills Loop').first().json;\nconst iteration = checkLoopData.iteration || 1;\n\nlet skillsData;\nlet jsonStr = content;\n\nif (content.includes('```json')) {\n  const match = content.match(/```json\\s*([\\s\\S]*?)\\s*```/);\n  if (match) jsonStr = match[1];\n} else if (content.includes('```')) {\n  const match = content.match(/```\\s*([\\s\\S]*?)\\s*```/);\n  if (match) jsonStr = match[1];\n} else {\n  const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) jsonStr = jsonMatch[0];\n}\n\ntry {\n  skillsData = JSON.parse(jsonStr.trim());\n} catch (e) {\n  throw new Error('Failed to parse shortened skills: ' + e.message);\n}\n\nreturn [{\n  json: {\n    skillsData: skillsData,\n    iteration: iteration,\n    branch: 'skills'\n  }\n}];"
+      },
+      "id": "ccad3a29-4c8d-498e-a6d2-aca4bcdb9c3a",
+      "name": "Parse Shortened Skills",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2064,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=AGGRESSIVELY shorten each skill category line to under 86 characters.\n\n<categories_too_long>\n{{ JSON.stringify($json.tooLongCategories) }}\n</categories_too_long>\n\n<valid_categories>\n{{ JSON.stringify($json.validCategories) }}\n</valid_categories>\n\n<CRITICAL_REQUIREMENT>\nEach line when rendered as \"Category: skill1, skill2, skill3\" must be UNDER 86 characters.\nYou must CUT aggressively. Be RUTHLESS.\n</CRITICAL_REQUIREMENT>\n\n<shortening_rules>\n1. SHORTEN category names: \"Data Analysis & Programming\" → \"Programming\"\n2. REMOVE ALL parenthetical details: \"Python (NumPy, Pandas)\" → \"Python\"\n3. USE abbreviations: \"PostgreSQL\" → \"Postgres\", \"JavaScript\" → \"JS\"\n4. REMOVE lowest-priority skills (keep only top 3-4 per category)\n5. COMBINE similar items: \"MySQL\", \"PostgreSQL\" → \"SQL (MySQL, Postgres)\"\n\n<examples>\nBEFORE (128 chars): \"Data Analysis & Programming: Python (NumPy, Pandas, scikit-learn), SQL (MySQL, complex queries), R (statistical modeling)\"\nAFTER (52 chars): \"Programming: Python, SQL, R, Machine Learning\"\n\nBEFORE (95 chars): \"Analytics Tools & Platforms: Power BI (visualization), Looker, Snowflake, Amplitude, DBT\"\nAFTER (50 chars): \"Analytics: Power BI, Looker, Snowflake, DBT\"\n</examples>\n\nReturn ONLY valid JSON with ALL categories (both fixed and already-valid ones):\n{\"skills_by_category\": {\"Programming\": [\"Python\", \"SQL\", \"R\"], \"Tools\": [\"Power BI\", \"Looker\"]}}",
+        "options": {
+          "returnIntermediateSteps": false
+        }
+      },
+      "id": "5dcc21c2-3dcd-4183-a532-7d0be5f8443b",
+      "name": "AI - Shorten Skills Lines",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1712,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-skills-continue",
+              "leftValue": "={{ $json.shouldContinue }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8f5f1e16-3601-47a4-bf76-3eba802ecbd4",
+      "name": "Check Skills Loop",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1424,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nlet skillsData = input.skillsData;\n\n// If coming from AI - Shorten Skills Lines, parse the response\nif (input.output || input.text) {\n  const content = input.output || input.text || '';\n  let jsonStr = content;\n  \n  if (content.includes('```json')) {\n    const match = content.match(/```json\\s*([\\s\\S]*?)\\s*```/);\n    if (match) jsonStr = match[1];\n  } else if (content.includes('```')) {\n    const match = content.match(/```\\s*([\\s\\S]*?)\\s*```/);\n    if (match) jsonStr = match[1];\n  } else {\n    const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) jsonStr = jsonMatch[0];\n  }\n  \n  try {\n    skillsData = JSON.parse(jsonStr.trim());\n  } catch (e) {\n    // Keep existing skillsData if parse fails\n  }\n}\n\nconst MAX_CHARS = 86;\nconst iteration = (input.iteration || 0) + 1;\n\n// Helper: calculate rendered line length for a category\nfunction getRenderedLineLength(category, skills) {\n  // Format: \"Category: skill1, skill2, skill3\"\n  const line = `${category}: ${skills.join(', ')}`;\n  return line.length;\n}\n\nconst skillsByCategory = skillsData.skills_by_category || {};\nconst tooLongCategories = [];\nconst validCategories = {};\n\nfor (const [category, skills] of Object.entries(skillsByCategory)) {\n  if (!Array.isArray(skills)) continue;\n  \n  const lineLength = getRenderedLineLength(category, skills);\n  if (lineLength > MAX_CHARS) {\n    tooLongCategories.push({\n      category: category,\n      skills: skills,\n      currentChars: lineLength,\n      needToRemove: lineLength - MAX_CHARS\n    });\n  } else {\n    validCategories[category] = skills;\n  }\n}\n\nconst allValid = tooLongCategories.length === 0;\nconst maxIterations = 5;\nconst shouldContinue = !allValid && iteration < maxIterations;\n\nreturn [{\n  json: {\n    skillsData: skillsData,\n    tooLongCategories: tooLongCategories,\n    validCategories: validCategories,\n    allValid: allValid,\n    iteration: iteration,\n    shouldContinue: shouldContinue,\n    branch: 'skills'\n  }\n}];"
+      },
+      "id": "f8dfbb55-a8aa-4d69-989a-358d8bbd7496",
+      "name": "Validate Skills Char Count",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nlet skillsData;\n\ntry {\n  const content = response.output || response.text || '';\n  \n  // 优先匹配 ```json...``` 代码块\n  let jsonStr = '';\n  const codeBlockMatches = content.match(/```json\\s*([\\s\\S]*?)\\s*```/g);\n  \n  if (codeBlockMatches && codeBlockMatches.length > 0) {\n    // 如果有多个JSON块，取最后一个（通常是修正后的版本）\n    const lastBlock = codeBlockMatches[codeBlockMatches.length - 1];\n    jsonStr = lastBlock.replace(/```json\\s*|\\s*```/g, '').trim();\n  } else {\n    // 回退：尝试匹配第一个完整的JSON对象\n    const jsonMatch = content.match(/\\{[\\s\\S]*?\\}(?=\\s*$|\\s*\\n|\\s*```)/); \n    if (jsonMatch) {\n      jsonStr = jsonMatch[0];\n    } else {\n      throw new Error('No JSON found in response');\n    }\n  }\n  \n  skillsData = JSON.parse(jsonStr);\n} catch (e) {\n  // 如果解析失败，使用rawSkillsByCategory作为后备\n  const fallbackData = $('Parse Generated Skills').first().json;\n  skillsData = { \n    skills_by_category: fallbackData.rawSkillsByCategory || {} \n  };\n}\n\n// Get previous data from Process Skills node\nconst previousData = $('Parse Generated Skills').first().json;\n\nreturn [{\n  json: {\n    ...previousData,\n    skillsData: {\n      skills_by_category: skillsData.skills_by_category || {}\n    },\n    iteration: 0,\n    branch: 'skills'\n  }\n}];"
+      },
+      "id": "2a8609a9-80a8-450a-a604-1fe38cec92b0",
+      "name": "Parse Refined Skills",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nlet skillsData;\n\ntry {\n  const content = response.output || response.text || '';\n  const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    skillsData = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found');\n  }\n} catch (e) {\n  skillsData = { skills_by_category: {} };\n}\n\nconst previousData = $('Process Skills').first().json;\n\nreturn [{\n  json: {\n    ...previousData,\n    rawSkillsByCategory: skillsData.skills_by_category || {},\n    branch: 'skills'\n  }\n}];"
+      },
+      "id": "59a93f97-3b59-4086-8c55-2099de27a59d",
+      "name": "Parse Generated Skills",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Synthesize the user's skillset with the JD requirements to create a high-impact Skills section.\n\n<jd_analysis>\n{{ JSON.stringify($json.jdAnalysis) }}\n</jd_analysis>\n\n<user_skills>\n{{ $json.skillsContent }}\n</user_skills>\n\n<logic_rules>\n1. ALIGNMENT: Use JD-specific terminology (e.g., if user has \"Matplotlib\" and JD asks for \"Data Visualization\", use \"Data Visualization (Matplotlib, Seaborn)\").\n2. REASONABLE ADAPTATION: If user lacks a tool (e.g., Snowflake) but has expert-level adjacent skills (e.g., SQL, MySQL, BigQuery), include the required tool as \"Familiar with [Tool]\" if it's a low-learning-curve item.\n3. HIERARCHY: Sort categories by relevance to the JD.\n4. LIMITS: Max 4 categories. Max 6 items per category. Total < 20 items.\n5. NO CHARACTER LIMIT in this step - focus on content quality and relevance.\n</logic_rules>\n\nReturn ONLY valid JSON: \n{\"skills_by_category\": {\"Languages\": [\"Python\", \"SQL (PostgreSQL)\", \"R\"], \"Tools\": [\"Snowflake (Familiar with cloud data warehousing)\", \"Git\", \"Looker\"]}}",
+        "options": {
+          "returnIntermediateSteps": false
+        }
+      },
+      "id": "124c0314-a32e-4713-9779-bbf2e9192c17",
+      "name": "AI - Generate Skills (Step 1)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -144,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const previousData = $('Parse JD Analysis').first().json;\n\nlet skillsContent = '';\ntry {\n  // Use n8n's built-in helper to read binary data (handles filesystem-v2 mode)\n  const binaryDataBuffer = await this.helpers.getBinaryDataBuffer(0, 'data');\n  skillsContent = binaryDataBuffer.toString('utf-8');\n} catch (e) {\n  skillsContent = '';\n}\n\nreturn [{\n  json: {\n    ...previousData,\n    skillsContent: skillsContent,\n    branch: 'skills'\n  }\n}];"
+      },
+      "id": "67aa7187-a7a6-4d0a-8581-869469d1c732",
+      "name": "Process Skills",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/.n8n-files/data/relevant_skills.md",
+        "options": {}
+      },
+      "id": "cabe8468-193f-40d4-bbac-ca30ed1fe001",
+      "name": "Read Skills File",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -720,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nlet coursesData;\n\ntry {\n  const content = response.output || response.text || '';\n  const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    coursesData = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found');\n  }\n} catch (e) {\n  coursesData = { selected_courses: [] };\n}\n\nreturn [{\n  json: {\n    bachelorCourses: coursesData.selected_courses || [],\n    branch: 'bachelor_courses'\n  }\n}];"
+      },
+      "id": "1c727a7c-3280-44d1-94a0-82992fcdadc4",
+      "name": "Parse Bachelor Courses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Select courses most relevant to the target job skills.\n\n<target_skills>\n{{ JSON.stringify($json.jdAnalysis.top_10_skills?.slice(0, 5).map(s => s.skill) || []) }}\n</target_skills>\n\n<available_courses>\n{{ $json.bachelorCoursesContent }}\n</available_courses>\n\n<rules>\n1. Select 4-6 courses with strongest skill alignment\n2. Prioritize courses matching top-ranked skills\n3. Return EXACT course names as listed\n4. If no strong matches, return empty array\n</rules>\n\nReturn ONLY valid JSON: {\"selected_courses\": [\"Statistics\", \"Linear Algebra\"]}",
+        "options": {
+          "returnIntermediateSteps": false
+        }
+      },
+      "id": "b75431a1-d58c-4c51-a313-7aa29aeb458f",
+      "name": "AI - Extract Bachelor Courses",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -496,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const previousData = $('Parse JD Analysis').first().json;\n\nlet bachelorCoursesContent = '';\ntry {\n  // Use n8n's built-in helper to read binary data (handles filesystem-v2 mode)\n  const binaryDataBuffer = await this.helpers.getBinaryDataBuffer(0, 'data');\n  bachelorCoursesContent = binaryDataBuffer.toString('utf-8');\n} catch (e) {\n  bachelorCoursesContent = '';\n}\n\nreturn [{\n  json: {\n    ...previousData,\n    bachelorCoursesContent: bachelorCoursesContent,\n    branch: 'bachelor_courses'\n  }\n}];"
+      },
+      "id": "b2e4c5a8-849b-46ee-8321-89fa546ae313",
+      "name": "Process Bachelor Courses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/.n8n-files/data/edu_bech_course.md",
+        "options": {}
+      },
+      "id": "e53ffdcd-a3f1-43e6-94eb-e76bc56de3f8",
+      "name": "Read Bachelor Courses File",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -944,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nlet coursesData;\n\ntry {\n  const content = response.output || response.text || '';\n  const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    coursesData = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found');\n  }\n} catch (e) {\n  coursesData = { selected_courses: [] };\n}\n\nreturn [{\n  json: {\n    masterCourses: coursesData.selected_courses || [],\n    branch: 'master_courses'\n  }\n}];"
+      },
+      "id": "514e42d2-c8dc-4bd7-93e9-d96696a63b54",
+      "name": "Parse Master Courses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const previousData = $('Parse JD Analysis').first().json;\n\nlet masterCoursesContent = '';\ntry {\n  // Use n8n's built-in helper to read binary data (handles filesystem-v2 mode)\n  const binaryDataBuffer = await this.helpers.getBinaryDataBuffer(0, 'data');\n  masterCoursesContent = binaryDataBuffer.toString('utf-8');\n} catch (e) {\n  masterCoursesContent = '';\n}\n\nreturn [{\n  json: {\n    ...previousData,\n    masterCoursesContent: masterCoursesContent,\n    branch: 'master_courses'\n  }\n}];"
+      },
+      "id": "eb050277-0c23-4285-b148-5cbda0bc6e5a",
+      "name": "Process Master Courses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/.n8n-files/data/edu_master_course.md",
+        "options": {}
+      },
+      "id": "ae342ef7-9be6-4b56-8935-90f77640c388",
+      "name": "Read Master Courses File",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -944,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nlet jdAnalysis;\n\ntry {\n  const content = response.output || response.text || '';\n  const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    jdAnalysis = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found');\n  }\n} catch (e) {\n  jdAnalysis = {\n    top_10_skills: [],\n    job_title: 'Unknown',\n    company_focus: 'Unknown',\n    error: e.message\n  };\n}\n\n// Get original JD from the workflow trigger\nconst triggerData = $('When Executed by Another Workflow').first().json;\nconst originalJD = triggerData['Job Description'] || '';\n\nreturn [{\n  json: {\n    jobDescription: originalJD,\n    jdAnalysis: jdAnalysis,\n    top3Skills: jdAnalysis.top_10_skills?.slice(0, 3) || []\n  }\n}];"
+      },
+      "id": "86c0ca4b-eacf-493c-9416-d6a130b8a8d2",
+      "name": "Parse JD Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1168,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze this job description to extract 10 key requirements and the underlying business context.\n\n<job_description>\n{{ $json['Job Description'] }}\n</job_description>\n\n<rules>\n1. IDENTIFY: Top 10 skills (technical, soft, and domain-specific).\n2. INFER: What is the primary business goal of this role? (e.g., \"Increasing user retention\", \"Optimizing infrastructure costs\").\n3. EXTRACT: Keywords used for success metrics (e.g., \"scalability\", \"latency\", \"conversion\").\n4. CATEGORIZE: Essential (Must-have) vs. Complementary (Nice-to-have).\n</rules>\n\nReturn ONLY valid JSON:\n{\n  \"top_10_skills\": [{\"rank\": 1, \"skill\": \"Python\", \"category\": \"technical\", \"jd_keywords\": [\"Python\", \"automation\"]}],\n  \"business_goal\": \"Optimize performance marketing ROI\",\n  \"success_metrics\": [\"efficiency\", \"ROI\", \"accuracy\"],\n  \"job_title\": \"Data Analyst\",\n  \"company_focus\": \"Fintech\"\n}",
+        "options": {
+          "returnIntermediateSteps": false
+        }
+      },
+      "id": "1703f216-dc65-44ef-92b4-9808ccfa14b7",
+      "name": "AI Agent - Analyze JD",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -1520,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4.5"
+        },
+        "options": {
+          "maxTokensToSample": 20000,
+          "temperature": 0.3
+        }
+      },
+      "id": "3f148c5a-3689-4ae6-976f-07d739c82385",
+      "name": "Claude - JD Analysis",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        -1456,
+        1008
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "NoS33HGuNguSCNNg",
+          "name": "Anthropic account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "AI - Extract Master Courses": {
+      "main": [
+        [
+          {
+            "node": "Parse Master Courses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "AI Agent - Analyze JD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI - Refine Skills Length (Step 2)1": {
+      "main": [
+        [
+          {
+            "node": "Parse Refined Skills",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude - JD Analysis4": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI - Extract Master Courses",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude - JD Analysis3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI - Refine Skills Length (Step 2)1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "AI - Generate Skills (Step 1)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude - JD Analysis2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI - Select Top 3 Projects",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude - JD Analysis1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI - Write Impact (Step 1)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude - JD Analysis6": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI - Extract Bachelor Courses",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Template File": {
+      "main": [
+        [
+          {
+            "node": "Generate Resume HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine All Data": {
+      "main": [
+        [
+          {
+            "node": "Read Template File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge All Results": {
+      "main": [
+        [
+          {
+            "node": "Combine All Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Skills & Projects": {
+      "main": [
+        [
+          {
+            "node": "Merge All Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Courses": {
+      "main": [
+        [
+          {
+            "node": "Merge All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Project Results": {
+      "main": [
+        [
+          {
+            "node": "Merge Skills & Projects",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Claude - Shortener": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI - Shorten Sentences",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize Project": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Project Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Shortened": {
+      "main": [
+        [
+          {
+            "node": "Validate Char Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI - Shorten Sentences": {
+      "main": [
+        [
+          {
+            "node": "Parse Shortened",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Loop": {
+      "main": [
+        [
+          {
+            "node": "AI - Shorten Sentences",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Finalize Project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Char Count": {
+      "main": [
+        [
+          {
+            "node": "Check Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Written Impact": {
+      "main": [
+        [
+          {
+            "node": "Validate Char Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI - Write Impact (Step 1)": {
+      "main": [
+        [
+          {
+            "node": "Parse Written Impact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Selected Projects": {
+      "main": [
+        [
+          {
+            "node": "AI - Write Impact (Step 1)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI - Select Top 3 Projects": {
+      "main": [
+        [
+          {
+            "node": "Parse Selected Projects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Projects": {
+      "main": [
+        [
+          {
+            "node": "AI - Select Top 3 Projects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Project Files": {
+      "main": [
+        [
+          {
+            "node": "Process Projects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude - Skills Shortener": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI - Shorten Skills Lines",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize Skills": {
+      "main": [
+        [
+          {
+            "node": "Merge Skills & Projects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Shortened Skills": {
+      "main": [
+        [
+          {
+            "node": "Validate Skills Char Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI - Shorten Skills Lines": {
+      "main": [
+        [
+          {
+            "node": "Parse Shortened Skills",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Skills Loop": {
+      "main": [
+        [
+          {
+            "node": "AI - Shorten Skills Lines",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Finalize Skills",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Skills Char Count": {
+      "main": [
+        [
+          {
+            "node": "Check Skills Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Refined Skills": {
+      "main": [
+        [
+          {
+            "node": "Validate Skills Char Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Generated Skills": {
+      "main": [
+        [
+          {
+            "node": "AI - Refine Skills Length (Step 2)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI - Generate Skills (Step 1)": {
+      "main": [
+        [
+          {
+            "node": "Parse Generated Skills",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Skills": {
+      "main": [
+        [
+          {
+            "node": "AI - Generate Skills (Step 1)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Skills File": {
+      "main": [
+        [
+          {
+            "node": "Process Skills",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Bachelor Courses": {
+      "main": [
+        [
+          {
+            "node": "Merge Courses",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "AI - Extract Bachelor Courses": {
+      "main": [
+        [
+          {
+            "node": "Parse Bachelor Courses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Bachelor Courses": {
+      "main": [
+        [
+          {
+            "node": "AI - Extract Bachelor Courses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Bachelor Courses File": {
+      "main": [
+        [
+          {
+            "node": "Process Bachelor Courses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Master Courses": {
+      "main": [
+        [
+          {
+            "node": "Merge Courses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Master Courses": {
+      "main": [
+        [
+          {
+            "node": "AI - Extract Master Courses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Master Courses File": {
+      "main": [
+        [
+          {
+            "node": "Process Master Courses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse JD Analysis": {
+      "main": [
+        [
+          {
+            "node": "Read Project Files",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Skills File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Bachelor Courses File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Master Courses File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - Analyze JD": {
+      "main": [
+        [
+          {
+            "node": "Parse JD Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude - JD Analysis": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Analyze JD",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3b9780210f45932c36b1cfa87a3255710e0659115329187832b5cdfd4dd59608"
+  }
+}

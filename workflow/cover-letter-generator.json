@@ -1,0 +1,644 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "path": "cover-letter-generator",
+        "httpMethod": "POST",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "33a23565-9f9d-47c3-b0dd-3e47226e7641",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        2928,
+        1200
+      ],
+      "webhookId": "cover-letter-generator-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const webhookData = $input.first().json;\n// Handle webhook body data - jobDescription can be in body or directly in json\nconst jobDescription = webhookData.body?.jobDescription || webhookData.jobDescription || '';\n// Extract key from webhook data (for PDF naming: key-R.pdf, key-CL.pdf)\nconst key = webhookData.body?.key ?? webhookData.key ?? 0;\n\nif (!jobDescription) {\n  throw new Error('Job Description is required. Send POST with JSON: {\"jobDescription\": \"...\", \"key\": 0}');\n}\n\nreturn [{\n  json: {\n    jobDescription: jobDescription,\n    key: key\n  }\n}];"
+      },
+      "id": "1257b333-30ca-45f8-bb00-59f2681dd869",
+      "name": "Prepare Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3152,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const resumeData = $input.first().json;\n\n// Extract resume HTML and plain text\nlet resumeHtml = '';\nlet resumePlainText = '';\n\nif (resumeData.resumeHtml) {\n  resumeHtml = resumeData.resumeHtml;\n  \n  // Convert HTML to plain text for AI analysis\n  // Remove HTML tags but keep structure\n  resumePlainText = resumeHtml\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n} else if (resumeData.binary?.resume) {\n  const buffer = Buffer.from(resumeData.binary.resume.data, 'base64');\n  resumeHtml = buffer.toString('utf-8');\n  resumePlainText = resumeHtml\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nconst previousData = $('Prepare Input').first().json;\n\nreturn [{\n  json: {\n    ...previousData,\n    resumeHtml: resumeHtml,\n    resumePlainText: resumePlainText,\n    resumeFileName: resumeData.fileName || 'resume'\n  }\n}];"
+      },
+      "id": "c5d7ad3f-49f2-4b00-b4eb-f85d6d25bb23",
+      "name": "Extract Resume Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3600,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4.5"
+        },
+        "options": {
+          "maxTokensToSample": 20000,
+          "temperature": 0.4
+        }
+      },
+      "id": "e3924d24-e1f5-4a80-9ef1-fa8e66ad94e2",
+      "name": "Claude - JD Analysis",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        3904,
+        1072
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "eufRu17DMZFpf7lV",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze this job description with a \"Hiring Manager mindset\" to extract strategic insights.\n\n<job_description>\n{{ $json.jobDescription }}\n</job_description>\n\n<analysis_rules>\n1. ROLE IDENTITY: What is the \"core mission\" of this role? (e.g., Is it to protect the bank? To drive growth? To automate manual work?)\n2. TECHNICAL STACK: Identify the top 3-5 non-negotiable hard skills.\n3. HIDDEN PAIN POINTS: Based on the responsibilities, what is the company likely struggling with? (e.g., data quality, regulatory pressure, scaling speed).\n4. CULTURE & TONE: Is the language formal/conservative (Big Bank) or energetic/casual (Tech Startup)? \n5. LOCATION CONTEXT: Where is the office located?\n6. SUCCESS CRITERIA: What would \"exceeding expectations\" look like in this role after 6 months?\n</analysis_rules>\n\nReturn ONLY valid JSON:\n{\n  \"company_name\": \"\",\n  \"role_title\": \"\",\n  \"location\": \"\",\n  \"core_mission\": \"One sentence summary of why this role exists\",\n  \"top_skills\": [],\n  \"inferred_pain_points\": \"The specific problem the candidate needs to solve\",\n  \"tone_and_style\": \"e.g., Professional/Rigorous or Bold/Innovative\",\n  \"value_proposition\": \"The #1 thing they are looking for in a candidate\"\n}",
+        "options": {
+          "returnIntermediateSteps": false
+        }
+      },
+      "id": "ee9f244b-91fb-4497-bbaa-41dc235cdd05",
+      "name": "AI Agent - Analyze JD",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        3824,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nlet jdAnalysis;\n\ntry {\n  const content = response.output || response.text || '';\n  const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    jdAnalysis = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found');\n  }\n} catch (e) {\n  jdAnalysis = {\n    company_name: 'Unknown Company',\n    role_title: 'Unknown Role',\n    top_5_requirements: [],\n    culture_keywords: [],\n    pain_points: '',\n    company_mission: '',\n    error: e.message\n  };\n}\n\nconst previousData = $('Extract Resume Content').first().json;\n\nreturn [{\n  json: {\n    ...previousData,\n    jdAnalysis: jdAnalysis\n  }\n}];"
+      },
+      "id": "a34cfa8d-1968-4377-8806-696c976d8f17",
+      "name": "Parse JD Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4176,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4.5"
+        },
+        "options": {
+          "maxTokensToSample": 20000,
+          "temperature": 0.5
+        }
+      },
+      "id": "817fc2f3-8e38-4775-b50a-211b140689a5",
+      "name": "Claude - Cover Letter Writer",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        4480,
+        1184
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "eufRu17DMZFpf7lV",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "==Write a high-impact, persuasive cover letter that positions the candidate as a \"Value Provider\" rather than a \"Learner.\"\n\n<job_analysis>\nCompany: {{ $json.jdAnalysis.company_name }}\nRole: {{ $json.jdAnalysis.role_title }}\nLocation: {{ $json.jdAnalysis.location }}\nCore Mission: {{ $json.jdAnalysis.core_mission }}\nPain Points: {{ $json.jdAnalysis.inferred_pain_points }}\nValue Prop: {{ $json.jdAnalysis.value_proposition }}\nStyle: {{ $json.jdAnalysis.tone_and_style }}\n</job_analysis>\n\n<candidate_resume>\n{{ $json.resumePlainText }}\n</candidate_resume>\n\n<writing_strategy>\n1. THE HOOK: Start with a \"Mission Connection.\" Don't say \"I am applying.\" Instead, state a belief or observation about their industry/company mission that aligns with your expertise.\n2. PROBLEM-SOLUTION FRAMEWORK: Address their \"Pain Points\" directly. For every skill mentioned, explain the IMPACT it created (e.g., \"Instead of 'I know SQL,' use 'Leveraged SQL to reduce processing time by X%'\").\n3. POSITIONING: Focus on \"Scalability,\" \"Reliability,\" or \"Interpretability\" (especially for Risk/Data roles). Show you care about the business outcome, not just the technical tool.\n4. RELOCATION (If applicable): If the candidate's current city (in resume) differs from {{ $json.jdAnalysis.location }}, include a brief, confident sentence about relocating.\n5. THE CLOSE: End with a contribution-focused call to action. What specific challenge are you eager to tackle for them?\n</writing_strategy>\n\n<formatting_rules>\n- Tone: Match the \"{{ $json.jdAnalysis.tone_and_style }}\".\n- Length: Max 300 words.\n- Visual Anchors: Use HTML <strong> tags for EXACTLY 5-6 key phrases. \n- Strategic Bolding: Highlight: (1) One major quantified achievement, (2) One niche technical skill, (3) One power verb + business outcome, (4) The company name.\n- First person only. No \"To whom it may concern.\"\n- Sign off: \"Sincerely,\" followed by the name from the resume.\n</formatting_rules>\n\nReturn ONLY valid JSON:\n{\n  \"cover_letter_text\": \"Full text with <strong> tags. Ensure no [Placeholder] brackets remain.\",\n  \"key_points_highlighted\": [\"Briefly list the 3 strongest links between resume and JD\"],\n  \"tone_analysis\": \"Description of the chosen writing voice\"\n}",
+        "options": {
+          "returnIntermediateSteps": false
+        }
+      },
+      "id": "619f5161-93b1-4896-b46f-e629197d4cdc",
+      "name": "AI Agent - Write Cover Letter",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        4400,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nlet coverLetterData;\n\ntry {\n  const content = response.output || response.text || '';\n  const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    coverLetterData = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found in AI response');\n  }\n} catch (e) {\n  coverLetterData = {\n    cover_letter_text: 'Error generating cover letter: ' + e.message,\n    key_points_highlighted: [],\n    tone_analysis: 'N/A',\n    error: e.message\n  };\n}\n\nconst previousData = $('Parse JD Analysis').first().json;\n\nreturn [{\n  json: {\n    ...previousData,\n    coverLetter: coverLetterData.cover_letter_text,\n    keyPoints: coverLetterData.key_points_highlighted || [],\n    toneAnalysis: coverLetterData.tone_analysis || ''\n  }\n}];"
+      },
+      "id": "d6400c94-10eb-4572-aa4f-615666fd61af",
+      "name": "Parse Cover Letter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4752,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\n// Get current date\nconst now = new Date();\nconst dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });\n\n// Create cover letter HTML with same style as resume\nconst coverLetterHtml = `<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>SHICHENG (SAM) GUAN - Cover Letter</title>\n  <style>\n    * {\n      margin: 0;\n      padding: 0;\n      box-sizing: border-box;\n    }\n\n    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');\n\n    body {\n      font-family: \"Inter\", sans-serif;\n      font-size: 11pt;\n      line-height: 1.4;\n      color: #000;\n      background: #fff;\n    }\n\n    .page {\n      max-width: 8.5in;\n      margin: 0 auto;\n      padding: 0.75in;\n    }\n\n    @page {\n      size: Letter portrait;\n      margin: 0;\n    }\n\n    @media print {\n      body {\n        -webkit-print-color-adjust: exact;\n        print-color-adjust: exact;\n        margin: 0;\n        padding: 0;\n      }\n      .page {\n        padding: 0.75in;\n      }\n    }\n\n    .header {\n      text-align: center;\n      margin-bottom: 20pt;\n    }\n\n    .name {\n      font-size: 24pt;\n      font-weight: bold;\n      margin-bottom: 2pt;\n      color: #1a3a6e;\n    }\n\n    .contact {\n      font-size: 11pt;\n    }\n\n    .contact a {\n      color: #0066cc;\n      text-decoration: underline;\n    }\n\n    .date {\n      margin-bottom: 20px;\n      font-size: 11pt;\n      margin-top: 20pt;\n    }\n\n    .content {\n      white-space: pre-wrap;\n      word-wrap: break-word;\n    }\n\n    .content p {\n      margin-bottom: 15px;\n      text-align: justify;\n    }\n  </style>\n</head>\n<body>\n  <div class=\"page\">\n    <header class=\"header\">\n      <h1 class=\"name\">SHICHENG (SAM) GUAN</h1>\n      <p class=\"contact\">226-868-7129 | <a href=\"mailto:sguan44@uwo.ca\">sguan44@uwo.ca</a> | London, Ontario | <a href=\"https://linkedin.com/in/sam-guan-ba865a220\">LinkedIn</a> | <a href=\"https://github.com/sguan119\">GitHub</a></p>\n    </header>\n\n    <div class=\"date\">${dateStr}</div>\n\n    <div class=\"content\">${data.coverLetter || 'Cover letter content not available'}</div>\n  </div>\n</body>\n</html>`;\n\nconst fileName = `CoverLetter_${data.jdAnalysis.company_name || 'Company'}_${Date.now()}`.replace(/[^a-zA-Z0-9_]/g, '_');\n\nreturn [{\n  json: {\n    ...data,\n    coverLetterHtml: coverLetterHtml,\n    fileName: fileName\n  },\n  binary: {\n    coverLetter: await this.helpers.prepareBinaryData(\n      Buffer.from(coverLetterHtml, 'utf-8'),\n      `${fileName}.html`,\n      'text/html; charset=utf-8'\n    )\n  }\n}];"
+      },
+      "id": "4e9a1097-ee21-4fd1-bd75-cd5c1ef74f5f",
+      "name": "Generate Cover Letter HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4976,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first();\n// Get key from Prepare Input node for PDF naming\nconst prepareInputData = $('Prepare Input').first().json;\nconst key = prepareInputData.key ?? 0;\n\nlet htmlContent = '';\n\nif (input.json.coverLetterHtml) {\n  htmlContent = input.json.coverLetterHtml;\n} else if (input.binary && input.binary.coverLetter) {\n  htmlContent = Buffer.from(input.binary.coverLetter.data, 'base64').toString('utf-8');\n} else {\n  throw new Error('No HTML content found');\n}\n\nconst fileName = input.json.fileName || `cover_letter_${Date.now()}`;\n\nreturn [{\n  json: {\n    htmlContent: htmlContent,\n    fileName: fileName,\n    key: key\n  },\n  binary: {\n    htmlFile: {\n      data: Buffer.from(htmlContent).toString('base64'),\n      mimeType: 'text/html',\n      fileName: 'index.html'\n    }\n  }\n}];"
+      },
+      "id": "7fd16984-a834-47db-a48b-f098d0c71539",
+      "name": "Prepare for PDF Conversion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5200,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/forms/chromium/convert/html",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "files",
+              "inputDataFieldName": "htmlFile"
+            },
+            {
+              "name": "paperWidth",
+              "value": "8.5"
+            },
+            {
+              "name": "paperHeight",
+              "value": "11"
+            },
+            {
+              "name": "landscape",
+              "value": "false"
+            },
+            {
+              "name": "marginTop",
+              "value": "0.5"
+            },
+            {
+              "name": "marginBottom",
+              "value": "0.5"
+            },
+            {
+              "name": "marginLeft",
+              "value": "0.75"
+            },
+            {
+              "name": "marginRight",
+              "value": "0.75"
+            },
+            {
+              "name": "printBackground",
+              "value": "true"
+            },
+            {
+              "name": "scale",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "19458282-e9e4-4018-aab9-920967e6b01d",
+      "name": "Gotenberg PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5424,
+        960
+      ],
+      "notesInFlow": true,
+      "notes": "Requires Gotenberg: docker run -p 3000:3000 gotenberg/gotenberg:8"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first();\n// Get key from Prepare Input node for PDF naming\nconst prepareInputData = $('Prepare Input').first().json;\nconst key = prepareInputData.key ?? 0;\n\nlet htmlContent = '';\n\n// Option 1: Get HTML from upstream Generate Resume HTML node (json.resumeHtml)\nif (input.json.resumeHtml) {\n  htmlContent = input.json.resumeHtml;\n}\n// Option 2: Get HTML from binary data (binary.resume)\nelse if (input.binary && input.binary.resume) {\n  htmlContent = Buffer.from(input.binary.resume.data, 'base64').toString('utf-8');\n}\nelse {\n  throw new Error('No HTML content found from upstream node');\n}\n\n// Fixed page settings for resume\nconst pageSize = 'Letter';\nconst orientation = 'portrait';\n\n// Use fileName from upstream or generate default\nconst fileName = input.json.fileName || `resume_${Date.now()}`;\n\nreturn [{\n  json: {\n    htmlContent: htmlContent,\n    pageSize: pageSize,\n    orientation: orientation,\n    fileName: fileName,\n    key: key\n  }\n}];"
+      },
+      "id": "b57d8ac3-9fa6-4b81-9a00-161bf47b0a46",
+      "name": "Process Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3600,
+        1248
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SIMPLIFIED: Page spacing is now controlled by template file\n// This node only prepares HTML for Gotenberg (requires file named 'index.html')\n\nconst data = $input.first().json;\nconst htmlContent = data.htmlContent;\nconst key = data.key ?? 0;\n\n// No need to inject any styles - template already has @page and .page padding\n// Just pass through the HTML content as-is\nconst finalHtml = htmlContent;\n\nreturn [{\n  json: {\n    htmlContent: finalHtml,\n    pageSize: data.pageSize,\n    orientation: data.orientation,\n    fileName: data.fileName,\n    key: key,\n    info: 'Page spacing controlled by template file'\n  },\n  binary: {\n    htmlFile: {\n      data: Buffer.from(finalHtml).toString('base64'),\n      mimeType: 'text/html',\n      fileName: 'index.html'\n    }\n  }\n}];"
+      },
+      "id": "6d278d18-3519-4ea4-9cf7-89c87c527fc9",
+      "name": "Convert to PDF",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3888,
+        1248
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/forms/chromium/convert/html",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "files",
+              "inputDataFieldName": "htmlFile"
+            },
+            {
+              "name": "paperWidth",
+              "value": "8.5"
+            },
+            {
+              "name": "paperHeight",
+              "value": "11"
+            },
+            {
+              "name": "landscape",
+              "value": "false"
+            },
+            {
+              "name": "marginTop",
+              "value": "0"
+            },
+            {
+              "name": "marginBottom",
+              "value": "0"
+            },
+            {
+              "name": "marginLeft",
+              "value": "0"
+            },
+            {
+              "name": "marginRight",
+              "value": "0"
+            },
+            {
+              "name": "printBackground",
+              "value": "true"
+            },
+            {
+              "name": "scale",
+              "value": "1"
+            },
+            {
+              "name": "preferCssPageSize",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "9397b74a-2157-439a-af7a-d10b70398f45",
+      "name": "Gotenberg PDF1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4176,
+        1248
+      ],
+      "notesInFlow": true,
+      "notes": "Using Gotenberg (Docker: gotenberg/gotenberg:8). Run: docker run -p 3000:3000 gotenberg/gotenberg:8"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "WML6nXF_0ngoJMTHEB2wn",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/WML6nXF_0ngoJMTHEB2wn",
+          "cachedResultName": "Resume Generator"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Job Description": "={{$json.jobDescription}}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3376,
+        1104
+      ],
+      "id": "af3944d4-3f68-4a09-9a4b-40f948df300e",
+      "name": "Call 'Resume Generator'"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first();\nconst previousData = $('Prepare for PDF Conversion').first().json;\n\nif (!input.binary) {\n  throw new Error('No binary data received from conversion service');\n}\n\nconst pdfBinary = input.binary.data;\nif (!pdfBinary) {\n  throw new Error('No PDF data found. Available keys: ' + Object.keys(input.binary).join(', '));\n}\n\n// Use key from workflow for PDF naming: {key}-CL.pdf\nconst key = previousData.key ?? 0;\nconst fileName = `${key}-CL.pdf`;\n\nreturn [{\n  json: {\n    success: true,\n    fileName: fileName,\n    filePath: `/home/node/.n8n-files/data/${fileName}`,\n    key: key\n  },\n  binary: {\n    pdf: {\n      ...pdfBinary,\n      fileName: fileName,\n      mimeType: 'application/pdf'\n    }\n  }\n}];"
+      },
+      "id": "cl-prepare-save",
+      "name": "Prepare CL PDF for Save",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [5648, 960]
+    },
+    {
+      "parameters": {
+        "fileName": "={{ '/home/node/.n8n-files/data/' + $json.fileName }}",
+        "dataPropertyName": "pdf",
+        "options": {}
+      },
+      "id": "cl-write-file",
+      "name": "Write CL PDF",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [5872, 960]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first();\nconst previousData = $('Convert to PDF').first().json;\n\nif (!input.binary) {\n  throw new Error('No binary data received from conversion service');\n}\n\nconst pdfBinary = input.binary.data;\nif (!pdfBinary) {\n  throw new Error('No PDF data found. Available keys: ' + Object.keys(input.binary).join(', '));\n}\n\n// Use key from workflow for PDF naming: {key}-R.pdf\nconst key = previousData.key ?? 0;\nconst fileName = `${key}-R.pdf`;\n\nreturn [{\n  json: {\n    success: true,\n    fileName: fileName,\n    filePath: `/home/node/.n8n-files/data/${fileName}`,\n    key: key\n  },\n  binary: {\n    pdf: {\n      ...pdfBinary,\n      fileName: fileName,\n      mimeType: 'application/pdf'\n    }\n  }\n}];"
+      },
+      "id": "resume-prepare-save",
+      "name": "Prepare Resume PDF for Save",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4400, 1248]
+    },
+    {
+      "parameters": {
+        "fileName": "={{ '/home/node/.n8n-files/data/' + $json.fileName }}",
+        "dataPropertyName": "pdf",
+        "options": {}
+      },
+      "id": "resume-write-file",
+      "name": "Write Resume PDF",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [4624, 1248]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Input": {
+      "main": [
+        [
+          {
+            "node": "Call 'Resume Generator'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Resume Content": {
+      "main": [
+        [
+          {
+            "node": "AI Agent - Analyze JD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude - JD Analysis": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Analyze JD",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - Analyze JD": {
+      "main": [
+        [
+          {
+            "node": "Parse JD Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse JD Analysis": {
+      "main": [
+        [
+          {
+            "node": "AI Agent - Write Cover Letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude - Cover Letter Writer": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Write Cover Letter",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - Write Cover Letter": {
+      "main": [
+        [
+          {
+            "node": "Parse Cover Letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Cover Letter": {
+      "main": [
+        [
+          {
+            "node": "Generate Cover Letter HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Cover Letter HTML": {
+      "main": [
+        [
+          {
+            "node": "Prepare for PDF Conversion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare for PDF Conversion": {
+      "main": [
+        [
+          {
+            "node": "Gotenberg PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gotenberg PDF": {
+      "main": [
+        [
+          {
+            "node": "Prepare CL PDF for Save",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare CL PDF for Save": {
+      "main": [
+        [
+          {
+            "node": "Write CL PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Input": {
+      "main": [
+        [
+          {
+            "node": "Convert to PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to PDF": {
+      "main": [
+        [
+          {
+            "node": "Gotenberg PDF1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gotenberg PDF1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Resume PDF for Save",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Resume PDF for Save": {
+      "main": [
+        [
+          {
+            "node": "Write Resume PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Resume Generator'": {
+      "main": [
+        [
+          {
+            "node": "Extract Resume Content",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Process Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "1875c354e68add66bfcb88b2f89ad58e5496268bf95948e7520bbb6eb498bbed"
+  }
+}
